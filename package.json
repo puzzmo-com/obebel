@@ -1,7 +1,7 @@
 {
   "name": "@puzzmo-com/obebel",
   "version": "0.0.1",
-  "description": "High level .ts/.d.ts/.js AST builder which sits on top of Babel's tooling. You shoudl obebel.",
+  "description": "High level .ts/.d.ts/.js AST builder which sits on top of Babel's tooling. You must obebel.",
   "repository": {
     "type": "git",
     "url": "https://github.com/puzzmo-com/obebel"
