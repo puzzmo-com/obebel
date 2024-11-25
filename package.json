@@ -1,0 +1,38 @@
+{
+  "name": "@puzzmo-com/obebel",
+  "version": "0.0.1",
+  "description": "High level .ts/.d.ts/.js AST builder which sits on top of Babel's tooling. You must obebel.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/puzzmo-com/obebel"
+  },
+  "license": "MIT",
+  "author": "Orta Therox <orta.therox@gmail.com>",
+  "type": "module",
+  "main": "./lib/obebel.js",
+  "files": [
+    "lib/",
+    "package.json",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@babel/generator": "7.26.0",
+    "@babel/parser": "^7.26.2",
+    "@babel/traverse": "7.25.9",
+    "@babel/types": "7.26.0"
+  },
+  "devDependencies": {
+    "@types/babel__generator": "^7.6.0",
+    "@types/babel__traverse": "^7.14.0",
+    "typescript": "5.6.2"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
