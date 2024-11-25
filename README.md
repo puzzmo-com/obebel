@@ -73,3 +73,7 @@ component.scope.addVariableDeclaration()
 
 // TODO: JSX
 ```
+
+## Contributing
+
+For now, this repo is an open source project which is pulled directly from the puzzmo.com codebase, so OSS contributions need be merged upstream and then come down.
