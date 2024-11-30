@@ -1,20 +1,11 @@
 // TODO:
 //  - Remove the 'prior' aspects of the builder
 //  - Port tests from burr fork
-//  - Do public repo port
 //
 import generator from "@babel/generator"
-import parser from "@babel/parser"
+import { parse, parseExpression } from "@babel/parser"
 import traverse from "@babel/traverse"
-import t, {
-  BlockStatement,
-  Declaration,
-  ExpressionStatement,
-  Statement,
-  TSType,
-  TSTypeParameterDeclaration,
-  addComment,
-} from "@babel/types"
+import * as t from "@babel/types"
 
 interface InterfaceProperty {
   docs?: string
@@ -37,8 +28,8 @@ interface NodeConfig {
 }
 
 /** Main entrypoint to  */
-export const createSourceFile = (priorSource: string, opts: {}) => {
-  const sourceFile = parser.parse(priorSource, { sourceType: "module", plugins: ["jsx", "typescript"] })
+export const createSourceFile = (opts: {}) => {
+  const sourceFile = parse("", { sourceType: "module", plugins: ["jsx", "typescript"] })
 
   /** Declares an import which should exist in the source document */
   const setImport = (source: string, opts: { mainImport?: string; subImports?: string[] }) => {
@@ -56,7 +47,12 @@ export const createSourceFile = (priorSource: string, opts: {}) => {
       }
 
       const importDeclaration = t.importDeclaration(imports, t.stringLiteral(source))
-      sourceFile.program.body.push(importDeclaration)
+      let lastIndex = 0
+      for (const statement of sourceFile.program.body) {
+        if (t.isImportOrExportDeclaration(statement)) lastIndex = sourceFile.program.body.indexOf(statement)
+      }
+
+      sourceFile.program.body.splice(lastIndex, 0, importDeclaration)
       return
     }
 
@@ -76,7 +72,7 @@ export const createSourceFile = (priorSource: string, opts: {}) => {
 
   /** Allows creating a type alias via an AST parsed string */
   const setTypeViaTemplate = (template: string) => {
-    const type = parser.parse(template, { sourceType: "module", plugins: ["jsx", "typescript"] })
+    const type = parse(template, { sourceType: "module", plugins: ["jsx", "typescript"] })
 
     const typeDeclaration = type.program.body.find((s) => s.type === "TSTypeAliasDeclaration")
     if (!typeDeclaration) throw new Error("No type declaration found in template: " + template)
@@ -117,13 +113,12 @@ export const createSourceFile = (priorSource: string, opts: {}) => {
       return
     }
 
-    // @ts-expect-error - ts/js babel interop issue
-    const code = generator(newAnnotion).code
+    const code = generator(typeDeclaration as any).code
     throw new Error(`Unsupported type annotation: ${newAnnotion.type} - ${code}`)
   }
 
   /** An internal API for describing a new area for inputting template info */
-  const createScope = (scopeName: string, scopeNode: t.Node, statements: Statement[]) => {
+  const createScope = (scopeName: string, scopeNode: t.Node, statements: t.Statement[]) => {
     const addFunction = (name: string) => {
       let functionNode = statements.find(
         (s) => t.isVariableDeclaration(s) && t.isIdentifier(s.declarations[0].id) && s.declarations[0].id.name === name,
@@ -137,7 +132,10 @@ export const createSourceFile = (priorSource: string, opts: {}) => {
       }
 
       const arrowFn = functionNode.declarations[0].init as t.ArrowFunctionExpression
-      if (!t.isArrowFunctionExpression(arrowFn)) throw new Error("Expected ArrowFunctionExpression")
+      if (!t.isArrowFunctionExpression(arrowFn)) throw new Error(`Expected an ArrowFunctionExpression when making ${scopeName}`)
+      if (!t.isBlock(arrowFn.body)) throw new Error(`Expected arrow fn's body to have many statements when making ${scopeName}`)
+
+      const fnStatements = arrowFn.body.body
 
       return {
         node: arrowFn,
@@ -152,7 +150,12 @@ export const createSourceFile = (priorSource: string, opts: {}) => {
           else exists.typeAnnotation = param.typeAnnotation
         },
 
-        scope: createScope(name, arrowFn, (arrowFn.body as BlockStatement).body),
+        addReturn: (expression: t.Expression | string) => {
+          const exp = typeof expression === "string" ? parseExpression(expression) : expression
+          fnStatements.push(t.returnStatement(exp))
+        },
+
+        scope: createScope(name, arrowFn, (arrowFn.body as t.BlockStatement).body),
       }
     }
 
@@ -170,7 +173,7 @@ export const createSourceFile = (priorSource: string, opts: {}) => {
       statements.push(declaration)
     }
 
-    const addTypeAlias = (name: string, type: "any" | "string" | TSType, nodeConfig?: NodeConfig) => {
+    const addTypeAlias = (name: string, type: "any" | "string" | "number" | t.TSType, nodeConfig?: NodeConfig) => {
       const prior = statements.find(
         (s) =>
           (t.isTSTypeAliasDeclaration(s) && s.id.name === name) ||
@@ -183,6 +186,7 @@ export const createSourceFile = (priorSource: string, opts: {}) => {
       if (typeof type === "string") {
         if (type === "any") typeNode = t.tsAnyKeyword()
         if (type === "string") typeNode = t.tsStringKeyword()
+        if (type === "number") typeNode = t.tsNumberKeyword()
       } else {
         typeNode = type
       }
@@ -259,11 +263,10 @@ export const createSourceFile = (priorSource: string, opts: {}) => {
   /** Experimental function for parsing out a graphql template tag, and ensuring certain fields have been called */
   const updateGraphQLTemplateTag = (expression: t.Expression, path: string, modelFields: string[]) => {
     if (path !== ".") throw new Error("Only support updating the root of the graphql tag ATM")
-    // @ts-expect-error - ts/js babel interop issue
     traverse(
       expression,
       {
-        TaggedTemplateExpression(path: traverse.NodePath<t.TaggedTemplateExpression>) {
+        TaggedTemplateExpression(path) {
           const { tag, quasi } = path.node
           if (t.isIdentifier(tag) && tag.name === "graphql") {
             // This is the graphql query
@@ -283,10 +286,9 @@ export const createSourceFile = (priorSource: string, opts: {}) => {
   }
 
   const parseStatement = (code: string) =>
-    parser.parse(code, { sourceType: "module", plugins: ["jsx", "typescript"] }).program.body[0] as ExpressionStatement
+    parse(code, { sourceType: "module", plugins: ["jsx", "typescript"] }).program.body[0] as t.ExpressionStatement
 
-  // @ts-expect-error - ts/js babel interop issue
-  const getResult = () => generator(sourceFile.program, {}).code
+  const getResult = (): string => generator(sourceFile.program, {}).code
 
   const rootScope = createScope("root", sourceFile, sourceFile.program.body)
   return { setImport, getResult, setTypeViaTemplate, parseStatement, updateGraphQLTemplateTag, rootScope }
@@ -294,7 +296,7 @@ export const createSourceFile = (priorSource: string, opts: {}) => {
 
 /** Parses something as though it is in type-space and extracts the subset of the AST that the string represents  */
 const getTypeLevelAST = (type: string) => {
-  const typeAST = parser.parse(`type A = ${type}`, { sourceType: "module", plugins: ["jsx", "typescript"] })
+  const typeAST = parse(`type A = ${type}`, { sourceType: "module", plugins: ["jsx", "typescript"] })
   const typeDeclaration = typeAST.program.body.find((s) => t.isTSTypeAliasDeclaration(s))
   if (!typeDeclaration) throw new Error("No type declaration found in template: " + type)
   return typeDeclaration.typeAnnotation
@@ -303,12 +305,12 @@ const getTypeLevelAST = (type: string) => {
 export type ForgeType = ReturnType<typeof createSourceFile>
 
 /** A little helper to handle all the extras   */
-const nodeFromNodeConfig = <T extends Declaration & { typeParameters?: TSTypeParameterDeclaration | null }>(
+const nodeFromNodeConfig = <T extends t.Declaration & { typeParameters?: t.TSTypeParameterDeclaration | null }>(
   node: T,
   nodeConfig?: NodeConfig,
 ) => {
   const statement = nodeConfig?.exported ? t.exportNamedDeclaration(node) : node
-  if (nodeConfig?.docs) addComment(statement, "leading", nodeConfig.docs)
+  if (nodeConfig?.docs) t.addComment(statement, "leading", nodeConfig.docs)
   if (nodeConfig?.generics && nodeConfig.generics.length > 0) {
     node.typeParameters = t.tsTypeParameterDeclaration(nodeConfig.generics.map((g) => t.tsTypeParameter(null, null, g.name)))
   }
