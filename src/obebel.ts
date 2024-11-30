@@ -1,5 +1,4 @@
 // TODO:
-//  - Remove the 'prior' aspects of the builder
 //  - Port tests from burr fork
 //
 import generator from "@babel/generator"
@@ -10,7 +9,7 @@ import * as t from "@babel/types"
 interface InterfaceProperty {
   docs?: string
   name: string
-  optional: boolean
+  optional?: boolean
   type: string
 }
 
@@ -151,7 +150,10 @@ export const createSourceFile = (opts: {}) => {
         },
 
         addReturn: (expression: t.Expression | string) => {
-          const exp = typeof expression === "string" ? parseExpression(expression) : expression
+          const exp =
+            typeof expression === "string"
+              ? parseExpression(expression, { sourceType: "module", plugins: ["jsx", "typescript"] })
+              : expression
           fnStatements.push(t.returnStatement(exp))
         },
 
@@ -173,7 +175,7 @@ export const createSourceFile = (opts: {}) => {
       statements.push(declaration)
     }
 
-    const addTypeAlias = (name: string, type: "any" | "string" | "number" | t.TSType, nodeConfig?: NodeConfig) => {
+    const addTypeAlias = (name: string, type: KnownTypes, nodeConfig?: NodeConfig) => {
       const prior = statements.find(
         (s) =>
           (t.isTSTypeAliasDeclaration(s) && s.id.name === name) ||
@@ -181,15 +183,9 @@ export const createSourceFile = (opts: {}) => {
       )
       if (prior) return
 
-      // Allow having some easy literals
-      let typeNode = null
-      if (typeof type === "string") {
-        if (type === "any") typeNode = t.tsAnyKeyword()
-        if (type === "string") typeNode = t.tsStringKeyword()
-        if (type === "number") typeNode = t.tsNumberKeyword()
-      } else {
-        typeNode = type
-      }
+      const typeNode = typeStringRef(type)
+
+      if (!typeNode) throw new Error(`Could not generate node for type alias with "${type}"`)
 
       const alias = t.tsTypeAliasDeclaration(t.identifier(name), null, typeNode!)
       const statement = nodeFromNodeConfig(alias, nodeConfig)
@@ -263,6 +259,7 @@ export const createSourceFile = (opts: {}) => {
   /** Experimental function for parsing out a graphql template tag, and ensuring certain fields have been called */
   const updateGraphQLTemplateTag = (expression: t.Expression, path: string, modelFields: string[]) => {
     if (path !== ".") throw new Error("Only support updating the root of the graphql tag ATM")
+    if (t.isSpreadElement(expression)) throw new Error("Can't run on a spread element")
     traverse(
       expression,
       {
@@ -316,4 +313,18 @@ const nodeFromNodeConfig = <T extends t.Declaration & { typeParameters?: t.TSTyp
   }
 
   return statement
+}
+
+type KnownTypes = "any" | "string" | "number" | (string & {}) | t.TSType
+const typeStringRef = (type: KnownTypes) => {
+  if (typeof type !== "string") return type
+  // Allow having some easy literals
+  let typeNode = null
+
+  if (type === "any") typeNode = t.tsAnyKeyword()
+  if (type === "string") typeNode = t.tsStringKeyword()
+  if (type === "number") typeNode = t.tsNumberKeyword()
+  if (!typeNode) typeNode = getTypeLevelAST(type)
+
+  return typeNode
 }

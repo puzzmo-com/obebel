@@ -1,6 +1,6 @@
-import { createSourceFile } from "./obebel"
+import { createSourceFile } from "../obebel"
 
-it("adds a new import", () => {
+it("creates a function", () => {
   const dts = createSourceFile({})
   dts.setImport("React", { subImports: ["useState"] })
 

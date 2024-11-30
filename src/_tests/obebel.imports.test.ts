@@ -1,4 +1,4 @@
-import { createSourceFile } from "./obebel"
+import { createSourceFile } from "../obebel"
 
 it("adds a new import", () => {
   const dts = createSourceFile({})
