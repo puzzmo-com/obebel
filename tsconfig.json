@@ -2,7 +2,6 @@
   "compilerOptions": {
     "declaration": true,
     "declarationMap": true,
-    "esModuleInterop": true,
     "module": "Node16",
     "moduleResolution": "node16",
     "outDir": "lib",
