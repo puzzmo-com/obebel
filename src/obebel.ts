@@ -1,6 +1,3 @@
-// TODO:
-//  - Port tests from burr fork
-//
 import generator from "@babel/generator"
 import { parse, parseExpression } from "@babel/parser"
 import traverse from "@babel/traverse"
@@ -27,7 +24,7 @@ interface NodeConfig {
 }
 
 /** Main entrypoint to  */
-export const createSourceFile = (opts: {}) => {
+export const createSourceFile = (_opts: {}) => {
   const sourceFile = parse("", { sourceType: "module", plugins: ["jsx", "typescript"] })
 
   /** Declares an import which should exist in the source document */
