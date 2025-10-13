@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsgo --noEmit"
   },
   "dependencies": {
     "@babel/generator": "7.26.0",
@@ -28,6 +28,7 @@
   "devDependencies": {
     "@types/babel__generator": "^7.6.0",
     "@types/babel__traverse": "^7.14.0",
+    "@typescript/native-preview": "*",
     "typescript": "5.8.3",
     "vitest": "catalog:"
   },
