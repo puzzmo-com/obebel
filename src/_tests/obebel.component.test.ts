@@ -1,3 +1,5 @@
+import { expect, it } from "vitest"
+
 import { createSourceFile } from "../obebel"
 
 it("edits an import", () => {
