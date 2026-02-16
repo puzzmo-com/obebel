@@ -1,3 +1,7 @@
+Archived due to my opinions on LLMs changing the value of making a project like this.
+
+--
+
 ## Obebel
 
 High-level .js/.ts/.d.ts builder API by sitting on top of Babel's tooling.
